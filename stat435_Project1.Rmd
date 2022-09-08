@@ -1,0 +1,194 @@
+---
+title: "Stat 435 Project 1"
+author: Ramyasai Sanjita Bhavirisetty (011713976)
+header-includes:
+   - \usepackage{bbm}
+   - \usepackage{amssymb}
+   - \usepackage{amsmath}
+   - \usepackage{graphicx}
+   - \usepackage{natbib}
+   - \usepackage{float}
+   - \floatplacement{figure}{H}
+output:
+  word_document: default
+fontsize: 12pt
+fonttype: TimesNewRoman
+---
+#Introduction
+
+Linear model selection befits the data set containing multiple potential variables. Subsequently the performance of the model is evaluated by goodness of fit as well as complexity of the model. Subset of predictors from potential variables might be a good model for prediction. The model might not explain the variability compared to more complex model but its interpretable capturing important variables (as given by domain) (citation). That being said, in regression environment multiple linear model is given by 
+
+M0=β0+β1X1+β2X2+β3X3+…+βp−qXp−q+ε
+
+where E(ε) = 0 and Var(ε) = σ2, β0 is the intercept, and β1,...,βp are the regression coefficients and X1,X2…Xp are p predictions modeled for Y response. The two important parameters to evaluate models (citation G. James et al., An Introduction to Statistical Learning: with Applications in R,
+Springer Texts in Statistics, DOI 10.1007/978-1-4614-7138-7 6,)conditioned when true relationship between predictors and response Y is linear.
+
+a) Prediction Accuracy: Mean square error (MSE) when model is used to predict response based on test observations determines the prediction accuracy. This is also referred as test error of model. R squared can be calculated for prediction based on MSE to provide prediction accuracy as a comparative index.
+
+b) Model Interpretability: Variables in model should have relevant meaning associated with response often domain originated. Irrelevant variables in model might increase prediction accuracy but fails in interpretability of model.
+Hence its overly important to choose the right bias-variance trade off by selecting right model with right predictors. There are classical/modern methods (citation chapter 6) for feature or variable selection
+
+i) Subset selection: Identifying appropriate subset of variables by best subset, forward stepwise selection and backward stepwise selection. Least square estimates (LSE) of coefficients are used to model. LSE predicts well when number of observation is larger than number of predictors with low bias and variance. 
+ii) Shrinkage: All variables used to model and then their coefficients are shrunken towards zero. Shrinkage, also called regularization, tends to reduce variance. There are two prominent shrinkage techniques used namely ridge regression and lasso.  
+iii) Dimension reduction: projection of p variables into M-dimensional plane where M<p. This can be done by modeling M unique linear combinations or projections. 
+
+This paper panders multiple linear regression estimating "median value of owner-occupied homes in $1000" in "Boston" data set by taking into account best subset selection, ridge regression and lasso using R.
+
+#Methods
+
+##Dataset description
+
+Data set `Boston` (which is contained in the library `MASS`). This data set contains $506$ observations on $14$ variables. The response variable is `medv`, and the rest are potential predictors. Namely, we are interested in predicting `medv` using a linear model. 
+
+```{r echo=FALSE}
+library(MASS)
+B=data.frame(Boston)
+B$chas=as.factor(B$chas)
+str(B)
+```
+## Model assumptions
+
+a) True relation between "medv" and predictors is linear
+b) Errors are normally distributed with mean zero and constant variance.
+c) No interaction among predictors
+
+## Creating training and validation sets
+
+```{r warning=FALSE, include=FALSE}
+library(knitr)
+opts_chunk$set(tidy.opts=list(width.cutoff=60),tidy=TRUE)
+```
+
+Randomly splitting the observations into a training set and a validation set, so that the training set can be used to fit a linear model, and the validation set can be used to evaluate the prediction accuracy of the fitted model. The splitting has been done 50:50 into non intersecting training and validation set.
+
+```{r echo=FALSE}
+set.seed(1)
+train=sample(506, 253, replace = FALSE)
+B.validate=B[-train,]
+B.train=B[train,]
+```
+
+## Best subset selection
+
+Best subset selection on all potential predictors without interactions between them by applying regsubsets() on training set and based on Bayesian Information Criterion (BIC) a subset of predictors determined. A linear model created with training set and the predictors suggested by best subset selection. Diagnostics were plotted along with correlation matrix for predictors.  The prediction accuracy of the fitted model on to validation set can be calculated as mean square error and thus R squared.
+
+## Lasso
+
+The first step to get optimum tuning parameter (lamda) by implementing 10 fold cross validation on training set. Implementing LASSO with the optimal tuning parameter on all potential predictors in training set without interactions between them. Best model coefficients were determined.Hypothesis testing was conducted for fitted model coefficients using p values provided by either lasso.proj(). Prediction accuracy can be determined by calculating R squared when lasso model implemented to validation set.
+
+## Ridge regresion
+
+The first step to get optimum tuning parameter (lamda) by implementing 10 fold cross validation on training set. Implementing ridge regression with the optimal tuning parameter on all potential predictors in training set without interactions between them. Best model were determined. Hypothesis testing was conducted for fitted model coefficients using p values provided by either ridge.proj(). Prediction accuracy can be determined by calculating R squared when ridge regression model implemented to validation set.
+
+#Results and discussion
+
+## Least square estimates (by best subset selection)
+
+Linear model predictors and their coefficient estimates are as following 
+```{r include=FALSE}
+set.seed(2)
+library(leaps)
+#best subset selection
+lm.fit=summary(regsubsets(medv~., B.train, nvmax = 13))
+# test error estimate by Bayesian information criterion (BIC) 
+which.min(lm.fit$bic) 
+```
+```{r echo=FALSE}
+#Based on BIC data set The best subset selected.
+B.train_LSE=B.train[,-c(2,3,4,7,12)]
+B.validate_LSE=B.validate[,-c(2,3,4,7,12)]
+lm.fit.LSE=lm(medv~.,B.train_LSE)
+summary(lm.fit.LSE) #coefficient by least square estimates
+```
+The training error is given by considering R squared i.e. 0.7568. Hypothesis can be conducted and all the coefficients in the fitted model is significant (pval<0.05) as they were selected based on best subset.The predictors in the model by LSE are crim, nox, rm, dis, rad, tax, ptratio and lstat. 
+
+```{r echo=FALSE}
+#model diagnostics
+plot(lm.fit.LSE) 
+```
+The model diagnostics reflects violation of model assumptions. Residuals seems to have non-normal distribution with non zero mean.
+```{r echo=FALSE}
+library(corrplot)
+corrplot(cor(B.train_LSE), method="circle")
+```
+Even though best subset selection picked the best model predictors based on goodness of fit, from above correlation matrix its evident that there are some variables not independent.R squared for validation set reflecting test error is 0.68. Correlation among predictors inflates variation increasing test error and thus reducing R squared.
+```{r include=FALSE}
+lm.LSE.pred=predict(lm.fit.LSE,newdata=B.validate_LSE) #predicting for validation set
+MSE_LSE=mean((lm.LSE.pred-B.validate_LSE$medv)^2)
+mean_test=mean(B.validate$medv)
+R2_LSE=1-(MSE_LSE/mean((mean_test-B.validate$medv)^2))
+R2_LSE #prediction accuracy
+```
+##Lasso
+
+Once optimum tuning parameter is obtained, lasso model was created with parameter and their coefficient estimates along with p values as following
+```{r include=FALSE}
+set.seed(3)
+library(glmnet)
+library(Matrix)
+Btrain_mx=model.matrix(medv~., data = B.train)
+Bvalidate_mx=model.matrix(medv~., data=B.validate)
+slamdas=10^seq(4,-3,length=1000)
+cv_lasso=cv.glmnet(Btrain_mx, B.train$medv, alpha = 1, lambda = slamdas)
+cv_lasso$lambda.min  #optimum tuning parameter (lamda)
+```
+```{r echo=FALSE}
+lassotrain=glmnet(Btrain_mx, B.train$medv, alpha = 1, lambda = slamdas)
+predict(lassotrain, s=cv_lasso$lambda.min, type = "coefficients") #non zero coefficients by lasso at optimum tuning parameter (lamda)
+#Hypothesis testing for the model suggested by lasso 
+#summary(lm(medv~., data = B.train[,-3],lambda = cv_lasso$lambda))
+library(hdi)
+library(scalreg)
+library(lars)
+lasso_projection=(lasso.proj(Btrain_mx[,-1], B.train$medv, family = "gaussian", Z=NULL, standardize = TRUE, multiplecorr.method = "none"))
+lasso_projection$pval
+```
+Predictors chas, nox, rm, dis, rad, tax, ptratio and lstat are significant (pval<0.05). Number of predictor is exactly same as best subset selection. R squared for validation set reflecting test error is 0.704.
+```{r include=FALSE}
+lasso_P=predict(lassotrain, s=cv_lasso$lambda.min, newx = Bvalidate_mx)
+MSE_lasso=mean((lasso_P-B.validate$medv)^2) #Test error by lasso for optimum tuning parameter (lamda)
+R2_lasso=1-(MSE_lasso/mean((mean_test-B.validate$medv)^2))
+R2_lasso
+```
+
+##Ridge regression
+
+```{r include=FALSE}
+set.seed(4)
+cv_ridge=cv.glmnet(Btrain_mx,B.train$medv, alpha=0, lambda = slamdas)
+cv_ridge$lambda.min #optimum tuning parameter (lamda) 
+```
+```{r echo=FALSE}
+ridgetrain=glmnet(Btrain_mx, B.train$medv, alpha=0, lamda=slamdas)
+predict(ridgetrain, s=cv_ridge$lambda.min, type = "coefficients")
+#Hypothesis testing
+ridge_projection=ridge.proj(Btrain_mx[,-1], B.train$medv, family = "gaussian", lambda =cv_ridge$lambda.min, standardize = TRUE,
+                    multiplecorr.method = "none")
+ridge_projection$pval
+```
+Predictors nox, rm, dis, rad, tax, ptratio and lstat are significant (pval<0.05). Number of predictors are 7, less compared to both best subset selection and lasso. R squared for validation set reflecting test error is 0.700.
+```{r include=FALSE}
+ridge_P=predict(ridgetrain, s=cv_ridge$lambda.min, newx = Bvalidate_mx)
+MSE_ridge=mean((ridge_P-B.validate$medv)^2) #test error by ridge regression for optimum tuning parameter (lamda)
+R2_ridge=1-(MSE_ridge/mean((mean_test-B.validate$medv)^2))
+R2_ridge
+```
+
+##Prediction accuracy and number of predictors
+
+```{r echo=FALSE}
+predictors=which.min(lm.fit$bic)
+summary=data.frame("Methods"=c("LSE", "LASSO", "Ridge regression"),
+                  "Prediction accuracy"=c(round(R2_LSE,3),round(R2_lasso,3), round(R2_ridge,3)),
+                  "Significant Predictors"=c(predictors, predictors , predictors-1),
+                  "optimum lamda"=c("NA",round(cv_lasso$lambda.min, 3),  round(cv_ridge$lambda.min,3)))
+summary
+```
+Above table summarizes the linear model based on number of predictors and prediction accuracy. LSE has low accuracy with 8 predictors compared to lasso and ridge as LSE disregards correlation among predictors.
+
+Shrinkage techniques incorporates colinearity in the model thus penalizing coefficients estimates to reduce variance inflated test error. Therefore, Lasso provides higher prediction accuracy of 0.704 even with 8 predictors. Ridge regression has 7 predictors with 0.700 prediction accuracy. Accuracy of ridge regression is similar lasso with a less predictor.
+
+#Conclusion
+
+The overall prediction accuracy is low as model assumptions were not met. Diagnostics plots suggested that error term is non normally distributed with mean non zero. Additionally, there is a possibility of variable interaction which was not considered in this paper. In order to further improve our model, interaction terms needs to be incorporated. As residual vs fitted values plot shows possibility of polynomial relation to response violating the assumption of true linear relation between predictors and response.
+With the above analysis, LSE lacks accuracy whereas ridge regression lack number of predictors. Based on the paradigm of this paper, a good trade off between bias and variance has been satisfied by lasso given the model assumptions are valid.
